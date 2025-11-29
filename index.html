@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SYSTEM CRITICAL ERROR</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            margin: 0;
+            padding: 10px;
+            user-select: none;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            touch-action: none; /* Mencegah zoom/scroll di HP */
+        }
+
+        #start-screen {
+            text-align: center;
+            z-index: 10;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 24px;
+        }
+
+        button {
+            background: #ff0000;
+            color: white;
+            border: 2px solid white;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            width: 100%;
+            max-width: 300px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        button:active {
+            background: #cc0000;
+            transform: scale(0.98);
+        }
+
+        #terminal {
+            display: none;
+            width: 95%;
+            height: 80%;
+            text-align: left;
+            font-size: 14px; /* Font lebih kecil untuk HP */
+            text-shadow: 0 0 5px #0f0;
+            word-wrap: break-word;
+            overflow-y: auto;
+        }
+
+        .line {
+            margin: 2px 0;
+            opacity: 0;
+            animation: fadeIn 0.1s forwards;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+            text-shadow: 0 0 5px red;
+        }
+
+        .warning {
+            color: yellow;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Flash Effect */
+        @keyframes flashRed {
+            0% { background-color: #000; }
+            50% { background-color: #300; }
+            100% { background-color: #000; }
+        }
+
+        .critical-mode {
+            animation: flashRed 0.5s infinite;
+        }
+
+        /* Fake Progress Bar */
+        #progress-container {
+            display: none;
+            width: 90%;
+            height: 25px;
+            border: 2px solid red;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: red;
+            transition: width 0.2s;
+        }
+
+        #deleting-text {
+            font-size: 16px;
+        }
+
+        #overlay-msg {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: red;
+            color: black;
+            padding: 20px;
+            width: 80%;
+            border: 5px solid white;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 0 50px red;
+            z-index: 100;
+        }
+
+        #safe-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #333;
+            color: #888;
+            font-size: 10px;
+            padding: 8px;
+            border: 1px solid #555;
+            z-index: 200;
+            opacity: 0.5;
+            border-radius: 4px;
+        }
+        
+        #safe-btn:active {
+            opacity: 1;
+            background: white;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Tombol Aman untuk Keluar -->
+    <button id="safe-btn" onclick="endPrank()">HENTIKAN PRANK (ESC)</button>
+
+    <!-- Layar Awal -->
+    <div id="start-screen">
+        <h1 style="color: white;">Mobile Diagnostics Tool</h1>
+        <p style="color: #aaa;">Klik tombol di bawah untuk memulai scan perangkat.</p>
+        <button onclick="startPrank()">MULAI SCAN</button>
+    </div>
+
+    <!-- Terminal Palsu -->
+    <div id="terminal"></div>
+
+    <!-- Progress Bar Penghapusan Palsu -->
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+    <h2 id="deleting-text" style="display:none; color: red; margin-top: 10px;">MENGHAPUS SEMUA DATA: <span id="perc">0</span>%</h2>
+
+    <!-- Pesan Popup Palsu -->
+    <div id="overlay-msg">
+        SYSTEM FAILURE<br>
+        DATA CORRUPTED<br><br>
+        JANGAN MATIKAN HP ANDA!
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        const startScreen = document.getElementById('start-screen');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const deletingText = document.getElementById('deleting-text');
+        const percText = document.getElementById('perc');
+        const overlay = document.getElementById('overlay-msg');
+        
+        // Suara beep palsu (AudioContext)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeep(freq = 440, type = 'square') {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1);
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // Fungsi getar HP (Vibration API)
+        function vibratePhone(ms) {
+            if (navigator.vibrate) {
+                navigator.vibrate(ms);
+            }
+        }
+
+        function addLine(text, type = 'normal') {
+            const div = document.createElement('div');
+            div.textContent = `> ${text}`;
+            div.className = 'line ' + type;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if(type === 'error') {
+                playBeep(100, 'sawtooth');
+                vibratePhone(100); // Getar saat error
+            } else {
+                playBeep(800, 'sine');
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function startPrank() {
+            startScreen.style.display = 'none';
+            terminal.style.display = 'block';
+
+            // Meminta full screen
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+                    document.documentElement.msRequestFullscreen();
+                }
+            } catch(e) {}
+
+            const logs = [
+                "Initializing android kernel...",
+                "Checking root permissions...",
+                "Loading system modules...",
+                "Scan /storage/emulated/0/... OK",
+                "Scan /system/bin/... OK",
+                "WARNING: Unauthorized ADB connection detected",
+                "Attempting to block port 5555...",
+                "FAILED. Security breach detected.",
+                "Malware signature found: ANDROID.TROJAN.GEN",
+                "CRITICAL ERROR: KERNEL PANIC",
+                "Root access granted to remote user...",
+                "Injecting payload to bootloader...",
+                "Overwriting recovery partition...",
+            ];
+
+            for (let log of logs) {
+                let type = 'normal';
+                if (log.includes("WARNING")) type = 'warning';
+                if (log.includes("ERROR") || log.includes("FAILED") || log.includes("Malware") || log.includes("Overwriting")) type = 'error';
+                
+                addLine(log, type);
+                await sleep(Math.random() * 400 + 100);
+            }
+
+            // Mulai efek panik
+            document.body.classList.add('critical-mode');
+            vibratePhone([200, 100, 200, 100, 200]); // Pola getar
+            
+            for (let i = 0; i < 15; i++) {
+                addLine(`DELETING: /DCIM/Camera/IMG_${Math.floor(Math.random()*9999)}.jpg`, 'error');
+                await sleep(50);
+            }
+
+            // Tampilkan progress bar penghapusan palsu
+            progressContainer.style.display = 'block';
+            deletingText.style.display = 'block';
+            
+            let percentage = 0;
+            while (percentage <= 100) {
+                progressBar.style.width = percentage + '%';
+                percText.innerText = percentage;
+                percentage++;
+                
+                if(percentage % 10 === 0) {
+                     addLine(`Wiping Data Partition: Block ${percentage * 524}...`, 'error');
+                     vibratePhone(50);
+                }
+                
+                await sleep(80);
+            }
+
+            // Final Popup
+            progressContainer.style.display = 'none';
+            deletingText.style.display = 'none';
+            overlay.style.display = 'block';
+            vibratePhone([500, 200, 500]); // Getar panjang di akhir
+            
+            // Loop pesan error cepat
+            setInterval(() => {
+                const randomX = Math.random() * (window.innerWidth - 100);
+                const randomY = Math.random() * (window.innerHeight - 50);
+                
+                const win = document.createElement('div');
+                win.style.position = 'fixed';
+                win.style.left = randomX + 'px';
+                win.style.top = randomY + 'px';
+                win.style.background = 'white';
+                win.style.color = 'black';
+                win.style.border = '2px solid red';
+                win.style.padding = '5px';
+                win.style.zIndex = '90';
+                win.style.fontWeight = 'bold';
+                win.style.fontSize = '12px';
+                win.innerText = "SYSTEM HALTED";
+                document.body.appendChild(win);
+                
+                // Batasi jumlah popup agar HP tidak lag berlebihan
+                if(document.body.childElementCount > 50) {
+                    document.body.removeChild(document.body.firstChild);
+                }
+                
+                playBeep(150, 'sawtooth');
+            }, 300);
+        }
+
+        function endPrank() {
+            // Hentikan semua efek dan tampilkan pesan prank
+            document.body.innerHTML = `
+                <div style="text-align:center; color: white; padding: 20px;">
+                    <h1 style="font-size: 40px; color: #0f0;">PRANK BERHASIL!</h1>
+                    <p>Tenang, HP Anda aman.</p>
+                    <p>Ini hanyalah simulasi halaman web HTML.</p>
+                    <button onclick="location.reload()" style="background:green;">ULANGI</button>
+                </div>
+            `;
+            document.body.style.backgroundColor = "#111";
+            document.body.classList.remove('critical-mode');
+            
+            // Stop vibration
+            if (navigator.vibrate) navigator.vibrate(0);
+            
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Tombol ESC untuk keluar
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                endPrank();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
